@@ -20,6 +20,7 @@ from app import db
 import os
 from urllib.parse import urlparse
 from pathlib import Path
+import re
 
 class ScraperService:
     def __init__(self):
@@ -139,35 +140,66 @@ class ScraperService:
                             link = element.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
                             full_link = base_url + link if not link.startswith('http') else link
                             
-                            # Extract image URL - updated selectors
+                            # Extract image URL - updated for carousel structure
                             try:
-                                # Try multiple possible image selectors
-                                img_elem = element.find_element(
-                                    By.CSS_SELECTOR, 
-                                    'img[srcset], img[data-src], img[src*="images.buyagift.co.uk"]'
-                                )
+                                # Wait for carousel to load
+                                wait = WebDriverWait(driver, 5)
+                                carousel = element.find_element(By.CSS_SELECTOR, '[data-media-carousel="true"]')
                                 
-                                # Try srcset first, then data-src, then src
-                                image_url = (
-                                    img_elem.get_attribute('srcset') or 
-                                    img_elem.get_attribute('data-src') or 
-                                    img_elem.get_attribute('src')
-                                )
+                                # Try to find image in carousel
+                                selectors = [
+                                    'img[loading="lazy"]',
+                                    'img[data-testid]',
+                                    'div[style*="background-image"]',  # For background images
+                                    '.lI.iZ.pS img',  # Specific class structure
+                                ]
                                 
-                                # If srcset contains multiple URLs, get the largest one
-                                if image_url and ' ' in image_url:
-                                    # Split srcset into URL/size pairs and get the largest
-                                    srcset_pairs = [pair.strip() for pair in image_url.split(',')]
-                                    largest_image = max(
-                                        srcset_pairs,
-                                        key=lambda x: int(x.split(' ')[1].replace('w', ''))
+                                img_elem = None
+                                for selector in selectors:
+                                    try:
+                                        # Wait briefly for each selector
+                                        img_elem = wait.until(
+                                            EC.presence_of_element_located(
+                                                (By.CSS_SELECTOR, selector)
+                                            )
+                                        )
+                                        if img_elem:
+                                            break
+                                    except:
+                                        continue
+                                
+                                if img_elem:
+                                    # Try different ways to get the image URL
+                                    image_url = (
+                                        img_elem.get_attribute('src') or
+                                        img_elem.get_attribute('data-src') or
+                                        img_elem.get_attribute('style')  # For background-image
                                     )
-                                    image_url = largest_image.split(' ')[0]
+                                    
+                                    # If we got a background-image style
+                                    if image_url and 'background-image' in image_url:
+                                        # Extract URL from background-image: url('...')
+                                        url_match = re.search(r"url\(['\"](.*?)['\"]", image_url)
+                                        if url_match:
+                                            image_url = url_match.group(1)
+                                    
+                                    self.logger.info(f"Found image URL: {image_url}")
+                                else:
+                                    # Try to get image from parent elements
+                                    parent_elements = element.find_elements(By.XPATH, './/*[contains(@style, "background-image")]')
+                                    if parent_elements:
+                                        style = parent_elements[0].get_attribute('style')
+                                        url_match = re.search(r"url\(['\"](.*?)['\"]", style)
+                                        if url_match:
+                                            image_url = url_match.group(1)
+                                            self.logger.info(f"Found background image URL: {image_url}")
+                                    else:
+                                        image_url = None
+                                        self.logger.warning(f"No image element found for gift: {title}")
                                 
-                                self.logger.info(f"Found image URL: {image_url}")
                             except Exception as img_error:
-                                image_url = None
                                 self.logger.warning(f"Could not find image for gift: {title}. Error: {str(img_error)}")
+                                image_url = None
                             
                             if price <= max_price:
                                 gift = Gift(

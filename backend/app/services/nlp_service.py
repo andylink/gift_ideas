@@ -99,10 +99,16 @@ class NLPService:
                 'languages', 'photography', 'road trips', 'flying', 'cruises',
                 'hotels', 'resorts', 'vacation', 'exploration'
             ],
-            'pets': [
+            'animals': [
                 'dogs', 'cats', 'pets', 'animals', 'birds', 'fish',
                 'reptiles', 'pet care', 'veterinary', 'training', 'grooming',
-                'animal welfare'
+                'animal welfare', 'pigs'
+            ],
+             'entertaining': [
+                'hosting', 'parties', 'entertaining', 'board games', 'card games',
+                'party planning', 'dinner parties', 'games night', 'social events',
+                'party games', 'tabletop games', 'puzzles', 'trivia', 'game night',
+                'hospitality', 'party host', 'gatherings', 'friends', 'family'  
             ]
         }
 

@@ -157,47 +157,39 @@ class ScraperService:
                             link = element.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
                             full_link = base_url + link if not link.startswith('http') else link
                             
-                            try:
-                                img_elem = element.find_element(
-                                    By.CSS_SELECTOR, 
-                                    'div[data-media-carousel="true"] img[src*="buyagift.co.uk/common/client/Images/Product"]'
-                                )
-                                
-                                if img_elem:
-                                    image_url = img_elem.get_attribute('src')
-                                    image_url = image_url.replace('/Small/', '/Large/')
-                                    self.logger.info(f"Found valid BuyAGift product image: {image_url}")
-                                else:
-                                    img_elem = element.find_element(
-                                        By.CSS_SELECTOR,
-                                        'div[data-media-carousel="true"] picture source[srcset]'
-                                    )
-                                    if img_elem:
-                                        srcset = img_elem.get_attribute('srcset')
-                                        urls = srcset.split(',')
-                                        for url in urls:
-                                            if 'Large' in url:
-                                                image_url = url.split(' ')[0].strip()
-                                                break
-                                        self.logger.info(f"Found valid BuyAGift product image from srcset: {image_url}")
-                                    else:
-                                        image_url = None
-                                        self.logger.warning(f"No product image found for gift: {title}")
-                                    
-                            except Exception as img_error:
-                                self.logger.warning(f"Could not find image for gift: {title}. Error: {str(img_error)}")
-                                image_url = None
-                                
+                            # Add this line to get the image URL
+                            image_url = element.find_element(By.CSS_SELECTOR, 'div[data-media-carousel="true"] img').get_attribute('src')
+                            
                             if price <= max_price:
+                                # Check if gift exists in database
+                                existing_gift = Gift.query.filter(
+                                    db.or_(
+                                        Gift.affiliate_link == full_link,
+                                        Gift.name == title
+                                    )
+                                ).first()
+                                
+                                if existing_gift:
+                                    self.logger.info(f"Found existing gift: {title}")
+                                    gifts.append(existing_gift)
+                                    continue
+                                
+                                # Process new gift
+                                category = self._determine_gift_category(title, price)
+                                tags = self._generate_tags(title, category)
+                                image_path = self._download_image(image_url, title) if image_url else None
+                                
                                 gift = Gift(
                                     name=title,
                                     price=price,
                                     affiliate_link=full_link,
                                     source="BuyAGift",
-                                    image_path=self._download_image(image_url, title) if image_url else None
+                                    image_path=image_path,
+                                    category=category,
+                                    tags=tags
                                 )
                                 gifts.append(gift)
-                                self.logger.info(f"Added gift: {title} (£{price}) with image: {image_url}")
+                                self.logger.info(f"Added new gift: {title} (£{price}) [Category: {category}] [Tags: {tags}]")
                                 
                         except Exception as e:
                             self.logger.error(f"Error parsing gift element: {str(e)}")
@@ -410,18 +402,11 @@ class ScraperService:
 
     def _check_database(self, criteria):
         """
-        Check database for existing gifts matching criteria
+        Check database for existing gifts matching criteria including categories and tags
         """
         try:
             print("\n=== Checking Database for Existing Gifts ===")
             print(f"Criteria received: {criteria}")
-            
-            # First, let's see what's in the database
-            all_gifts = Gift.query.all()
-            print(f"\nTotal gifts in database: {len(all_gifts)}")
-            print("Sample of gifts in database:")
-            for gift in all_gifts[:5]:  # Show first 5 gifts
-                print(f"- {gift.name} (£{gift.price}) [source: {gift.source}, tags: {gift.tags}]")
             
             # Build query filters
             filters = []
@@ -430,34 +415,55 @@ class ScraperService:
             if max_price := criteria.get('max_price'):
                 filters.append(Gift.price <= max_price)
                 print(f"\nAdded price filter: <= {max_price}")
-                # Debug: Show gifts that match price
-                price_matches = Gift.query.filter(Gift.price <= max_price).all()
-                print(f"Gifts matching price filter: {len(price_matches)}")
             
             # Source filter - let's check specifically for buyagift
             filters.append(Gift.source == 'buyagift')
-            print(f"\nAdded source filter: buyagift")
-            source_matches = Gift.query.filter(Gift.source == 'buyagift').all()
-            print(f"Gifts matching source filter: {len(source_matches)}")
             
             # Category filter
             if categories := criteria.get('categories'):
                 if len(categories) > 0:
                     filters.append(Gift.category.in_(categories))
                     print(f"\nAdded category filter: {categories}")
-                    
-            # Execute final query with all filters
-            print("\nExecuting final database query...")
-            query = Gift.query.filter(and_(*filters))
-            print(f"SQL Query: {query}")  # Print the actual SQL query
+            
+            # Tag matching
+            tag_filters = []
+            
+            # Add occasion to tags if present
+            if occasion := criteria.get('occasion'):
+                tag_filters.append(occasion)
+                
+            # Add relationship to tags if present
+            if relationship := criteria.get('relationship'):
+                tag_filters.append(relationship)
+                
+            # Add gender to tags if present
+            if gender := criteria.get('gender'):
+                tag_filters.append(gender)
+                
+            # Add interests to tags if present
+            if interests := criteria.get('interests'):
+                tag_filters.extend(interests)
+                
+            if tag_filters:
+                # Create a filter that checks if any of the tags are present
+                tag_conditions = []
+                for tag in tag_filters:
+                    tag_conditions.append(Gift.tags.like(f'%{tag}%'))
+                filters.append(db.or_(*tag_conditions))
+                print(f"\nAdded tag filters: {tag_filters}")
+            
+            # Execute query with all filters
+            print("\nExecuting database query...")
+            query = Gift.query.filter(db.and_(*filters))
+            print(f"SQL Query: {query}")
             
             existing_gifts = query.all()
             
             print(f"\nFound {len(existing_gifts)} matching gifts in database")
             if existing_gifts:
-                print("Matching gifts:")
-                for gift in existing_gifts:
-                    print(f"- {gift.name} (£{gift.price}) [source: {gift.source}]")
+                print("Sample of matching gifts:")
+                for gift in existing_gifts[:5]:  # Show first 5 gifts
+                    print(f"- {gift.name} (£{gift.price}) [Category: {gift.category}] [Tags: {gift.tags}]")
             else:
                 print("No matching gifts found!")
                 
@@ -472,17 +478,28 @@ class ScraperService:
 
     def _save_new_gifts(self, gifts):
         """
-        Save new gifts to database
+        Save new gifts to database, skipping any that already exist
         """
         try:
-            for gift in gifts:
-                # Check if gift already exists by URL to avoid duplicates
-                existing = Gift.query.filter_by(affiliate_link=gift.affiliate_link).first()
-                if not existing:
-                    db.session.add(gift)
+            new_count = 0
+            skipped_count = 0
             
+            for gift in gifts:
+                # Double check gift doesn't exist before saving
+                if self._gift_exists(gift.affiliate_link, gift.name):
+                    self.logger.info(f"Skipping existing gift: {gift.name}")
+                    skipped_count += 1
+                    continue
+                
+                # If it's new, add to database
+                db.session.add(gift)
+                new_count += 1
+                self.logger.info(f"Added new gift: {gift.name}")
+            
+            # Commit all changes
             db.session.commit()
-            self.logger.info("Successfully saved new gifts to database")
+            self.logger.info(f"Saved {new_count} new gifts to database (skipped {skipped_count} existing gifts)")
+            
         except Exception as e:
             self.logger.error(f"Error saving gifts to database: {str(e)}")
             db.session.rollback()
@@ -522,3 +539,74 @@ class ScraperService:
         except Exception as e:
             self.logger.error(f"Error downloading image from {image_url}: {str(e)}")
             return None
+
+    def _determine_gift_category(self, title: str, price: float) -> str:
+        """Determine the gift category based on title and other attributes"""
+        title_lower = title.lower()
+        
+        # Define category keywords
+        categories = {
+            'driving': ['driving', 'car', 'racing', 'track day', 'supercar'],
+            'food_drink': ['dining', 'restaurant', 'food', 'drink', 'tasting', 'lunch', 'dinner', 'afternoon tea'],
+            'spa': ['spa', 'massage', 'facial', 'beauty', 'treatment', 'pamper'],
+            'adventure': ['adventure', 'outdoor', 'flying', 'skydiving', 'climbing', 'experience'],
+            'short_breaks': ['hotel', 'stay', 'break', 'getaway', 'night'],
+            'entertainment': ['theatre', 'show', 'concert', 'cinema', 'musical', 'comedy'],
+            'sports': ['football', 'golf', 'stadium', 'match', 'training', 'fitness'],
+            'experiences': ['experience', 'tour', 'lesson', 'class', 'workshop']
+        }
+        
+        # Check title against category keywords
+        for category, keywords in categories.items():
+            if any(keyword in title_lower for keyword in keywords):
+                return category
+                
+        # Default category based on price
+        if price >= 200:
+            return 'luxury'
+        return 'experiences'  # Default category
+
+    def _generate_tags(self, title: str, category: str) -> str:
+        """Generate relevant tags based on gift attributes"""
+        tags = set()
+        title_lower = title.lower()
+        
+        # Add category as a tag
+        tags.add(category)
+        
+        # Price-based tags
+        if hasattr(self, 'price'):
+            if self.price <= 50:
+                tags.add('budget-friendly')
+            elif self.price >= 200:
+                tags.add('luxury')
+        
+        # Experience-related tags
+        experience_keywords = {
+            'romantic': ['couple', 'romantic', 'date', 'two'],
+            'family': ['family', 'kids', 'children'],
+            'adventure': ['thrill', 'adventure', 'exciting', 'adrenaline'],
+            'relaxation': ['spa', 'massage', 'relax', 'pamper'],
+            'food_lover': ['dining', 'tasting', 'gourmet', 'restaurant'],
+            'outdoor': ['outdoor', 'nature', 'garden', 'wildlife'],
+            'cultural': ['theatre', 'museum', 'art', 'culture'],
+            'learning': ['class', 'lesson', 'workshop', 'learn']
+        }
+        
+        for tag, keywords in experience_keywords.items():
+            if any(keyword in title_lower for keyword in keywords):
+                tags.add(tag)
+        
+        # Convert set to comma-separated string
+        return ','.join(sorted(tags))
+
+    def _gift_exists(self, affiliate_link: str, name: str) -> bool:
+        """
+        Check if a gift already exists by checking both affiliate_link and name
+        """
+        return Gift.query.filter(
+            db.or_(
+                Gift.affiliate_link == affiliate_link,
+                Gift.name == name
+            )
+        ).first() is not None

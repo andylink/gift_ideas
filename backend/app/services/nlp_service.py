@@ -53,6 +53,11 @@ class NLPService:
                 'brewing', 'coffee', 'tea', 'vegan', 'vegetarian', 'desserts',
                 'pastry', 'gourmet', 'foodie', 'recipes', 'dining'
             ],
+            'alcohol': [
+                'beer', 'ale', 'lager', 'craft beer', 'brewing', 'wine', 'whiskey', 
+                'whisky', 'spirits', 'drinking', 'pub', 'brewery', 'alcohol', 
+                'cocktails', 'gin', 'rum', 'vodka', 'cider', 'booze', 'drinks'
+            ],
             'art': [
                 'painting', 'drawing', 'crafts', 'artistic', 'creative',
                 'sculpture', 'pottery', 'ceramics', 'photography', 'digital art',
@@ -334,7 +339,7 @@ class NLPService:
             'friend': ['friend'],
             'family': ['mother', 'father', 'sister', 'brother', 'mom', 'dad', 
                       'aunt', 'uncle', 'cousin', 'grandmother', 'grandfather'],
-            'romantic': ['boyfriend', 'girlfriend', 'partner', 'spouse', 'husband', 'wife'],
+            'romantic': ['boyfriend', 'girlfriend', 'partner', 'spouse', 'husband', 'wife', 'wifes', 'wife\'s'],
             'colleague': ['colleague', 'coworker', 'boss', 'employee'],
         }
         
@@ -370,6 +375,11 @@ class NLPService:
             'gardening': ['garden', 'outdoor', 'home', 'experiences'],
             'home': ['home_decor', 'smart_home', 'kitchen', 'garden'],
             'luxury': ['luxury', 'experiences', 'fashion', 'jewelry'],
+            'alcohol': ['food_drink', 'gourmet', 'experiences', 'wine', 'beer'],
+            'beer': ['food_drink', 'gourmet', 'experiences', 'beer'],
+            'novelty': ['novelty', 'experiences', 'gadgets', 'subscriptions'],
+            'gadgets': ['gadgets', 'electronics', 'experiences', 'smart_home'],
+            'driving': ['driving', 'experiences', 'gadgets', 'travel'],
             'entertainment': ['entertainment', 'experiences', 'gadgets', 'subscriptions']
         }
         

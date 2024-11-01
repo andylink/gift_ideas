@@ -17,6 +17,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from tenacity import retry, stop_after_attempt, wait_exponential
 from sqlalchemy import and_
 from app import db
+import os
+from urllib.parse import urlparse
+from pathlib import Path
 
 class ScraperService:
     def __init__(self):
@@ -45,6 +48,17 @@ class ScraperService:
             'driving': 'Driving',
             'flying': 'Flying'
         }
+
+        # Define static folder path relative to the app directory
+        app_dir = Path(__file__).parent.parent  # gets the app/ directory
+        self.image_folder = app_dir / 'static' / 'gift_images'
+        self.debug_folder = app_dir / 'static' / 'debug_html'
+        
+        # Create the directories if they don't exist
+        self.image_folder.mkdir(parents=True, exist_ok=True)
+        self.debug_folder.mkdir(parents=True, exist_ok=True)
+        
+        self.logger.info(f"Image folder path: {self.image_folder}")
 
     def find_gifts(self, criteria):
         """
@@ -95,47 +109,85 @@ class ScraperService:
         
         try:
             driver = self._get_driver()
-            self.logger.info("Chrome WebDriver initialized successfully")
-            
             search_urls = self._get_buyagift_search_urls(criteria)
             max_price = criteria.get('max_price', 1000)
             
             for url in search_urls:
                 try:
+                    self.logger.info(f"Scraping URL: {url}")
                     driver.get(url)
-                    time.sleep(3)
                     
-                    products = driver.find_elements(By.CSS_SELECTOR, 'div[data-product-id]')
-                    self.logger.info(f"Found {len(products)} products")
+                    # Save page source for debugging
+                    debug_file = self.debug_folder / 'buyagift_debug.html'
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(driver.page_source)
                     
-                    for product in products:
+                    wait = WebDriverWait(driver, 10)
+                    gift_elements = wait.until(
+                        EC.presence_of_all_elements_located(
+                            (By.CSS_SELECTOR, '[data-product-id]')
+                        )
+                    )
+                    
+                    self.logger.info(f"Found {len(gift_elements)} gift elements")
+                    
+                    for element in gift_elements:
                         try:
-                            title = product.find_element(By.CSS_SELECTOR, 'h3[data-testid="product-name"]').get_attribute('title')
-                            price_text = product.find_element(By.CSS_SELECTOR, 'span[data-testid="price"]').text
+                            title = element.find_element(By.CSS_SELECTOR, 'h3[data-testid="product-name"]').get_attribute('title')
+                            price_text = element.find_element(By.CSS_SELECTOR, 'span[data-testid="price"]').text
                             price = float(price_text.replace('£', '').replace(',', ''))
-                            link = product.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
+                            link = element.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
                             full_link = base_url + link if not link.startswith('http') else link
+                            
+                            # Extract image URL - updated selectors
+                            try:
+                                # Try multiple possible image selectors
+                                img_elem = element.find_element(
+                                    By.CSS_SELECTOR, 
+                                    'img[srcset], img[data-src], img[src*="images.buyagift.co.uk"]'
+                                )
+                                
+                                # Try srcset first, then data-src, then src
+                                image_url = (
+                                    img_elem.get_attribute('srcset') or 
+                                    img_elem.get_attribute('data-src') or 
+                                    img_elem.get_attribute('src')
+                                )
+                                
+                                # If srcset contains multiple URLs, get the largest one
+                                if image_url and ' ' in image_url:
+                                    # Split srcset into URL/size pairs and get the largest
+                                    srcset_pairs = [pair.strip() for pair in image_url.split(',')]
+                                    largest_image = max(
+                                        srcset_pairs,
+                                        key=lambda x: int(x.split(' ')[1].replace('w', ''))
+                                    )
+                                    image_url = largest_image.split(' ')[0]
+                                
+                                self.logger.info(f"Found image URL: {image_url}")
+                            except Exception as img_error:
+                                image_url = None
+                                self.logger.warning(f"Could not find image for gift: {title}. Error: {str(img_error)}")
                             
                             if price <= max_price:
                                 gift = Gift(
                                     name=title,
                                     price=price,
                                     affiliate_link=full_link,
-                                    source='buyagift',
-                                    description='',
-                                    category=self._determine_category(title, ''),
-                                    tags=''
+                                    source="BuyAGift",
+                                    image_path=self._download_image(image_url, title) if image_url else None
                                 )
                                 gifts.append(gift)
+                                self.logger.info(f"Added gift: {title} (£{price}) with image: {image_url}")
                                 
                         except Exception as e:
-                            self.logger.warning(f"Error extracting product details: {str(e)}")
+                            self.logger.error(f"Error parsing gift element: {str(e)}")
                             continue
-                            
+                        
                 except Exception as e:
                     self.logger.error(f"Error scraping BuyAGift URL {url}: {str(e)}")
                     continue
-                    
+                
         finally:
             if driver:
                 driver.quit()
@@ -415,3 +467,39 @@ class ScraperService:
         except Exception as e:
             self.logger.error(f"Error saving gifts to database: {str(e)}")
             db.session.rollback()
+
+    def _download_image(self, image_url, gift_id):
+        """
+        Downloads and saves an image locally
+        Returns the local path to the saved image
+        """
+        try:
+            if not image_url:
+                return None
+                
+            # Create filename from gift_id and original extension
+            parsed_url = urlparse(image_url)
+            ext = os.path.splitext(parsed_url.path)[1]
+            if not ext:
+                ext = '.jpg'  # Default extension
+            filename = f"gift_{gift_id}{ext}"
+            
+            # Full path for saving
+            image_path = self.image_folder / filename
+            
+            # Download and save image
+            response = requests.get(image_url, stream=True)
+            response.raise_for_status()
+            
+            with open(image_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    
+            self.logger.info(f"Saved image for gift {gift_id} to {image_path}")
+            
+            # Return the URL path that Flask will use to serve the image
+            return f"/static/gift_images/{filename}"
+            
+        except Exception as e:
+            self.logger.error(f"Error downloading image from {image_url}: {str(e)}")
+            return None

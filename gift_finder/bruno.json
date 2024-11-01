@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "gift_finder",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

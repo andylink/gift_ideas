@@ -1,0 +1,21 @@
+meta {
+  name: get gift ideas
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:5000/api/find-gifts
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+  "description": "Looking for a gift for my wife who is 45 years old. SHe likes dogs and friends. My budget is around £500. Its for her birthday next month."
+  }
+}

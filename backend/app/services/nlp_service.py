@@ -35,23 +35,128 @@ class NLPService:
     def _initialize_keywords(self):
         """Initialize keyword dictionaries for pattern matching"""
         self.interest_keywords = {
-            'sports': ['football', 'basketball', 'tennis', 'golf', 'fitness', 'running'],
-            'technology': ['gaming', 'computers', 'gadgets', 'tech', 'electronics'],
-            'cooking': ['cooking', 'baking', 'kitchen', 'food', 'culinary'],
-            'art': ['painting', 'drawing', 'crafts', 'artistic', 'creative'],
-            'music': ['music', 'guitar', 'piano', 'singing', 'concerts'],
-            'reading': ['books', 'reading', 'literature', 'novels'],
-            'outdoor': ['hiking', 'camping', 'adventure', 'nature'],
-            'fashion': ['clothes', 'fashion', 'shopping', 'style'],
+            'sports': [
+                'football', 'basketball', 'tennis', 'golf', 'fitness', 'running',
+                'cycling', 'swimming', 'yoga', 'gym', 'exercise', 'rugby', 'cricket',
+                'boxing', 'martial arts', 'climbing', 'volleyball', 'skiing',
+                'snowboarding', 'surfing', 'athletics', 'baseball', 'soccer'
+            ],
+            'technology': [
+                'gaming', 'computers', 'gadgets', 'tech', 'electronics', 'video games',
+                'programming', 'coding', 'pc', 'playstation', 'xbox', 'nintendo',
+                'smartphone', 'tablet', 'smart home', 'vr', 'virtual reality',
+                'drones', 'photography', 'cameras', 'audio', 'headphones'
+            ],
+            'cooking': [
+                'cooking', 'baking', 'kitchen', 'food', 'culinary', 'chef',
+                'bbq', 'barbecue', 'grilling', 'wine', 'cocktails', 'mixology',
+                'brewing', 'coffee', 'tea', 'vegan', 'vegetarian', 'desserts',
+                'pastry', 'gourmet', 'foodie', 'recipes', 'dining'
+            ],
+            'art': [
+                'painting', 'drawing', 'crafts', 'artistic', 'creative',
+                'sculpture', 'pottery', 'ceramics', 'photography', 'digital art',
+                'illustration', 'design', 'sketching', 'calligraphy', 'printmaking',
+                'jewelry making', 'woodworking', 'knitting', 'sewing', 'crafting'
+            ],
+            'music': [
+                'music', 'guitar', 'piano', 'singing', 'concerts', 'drums',
+                'violin', 'bass', 'DJ', 'electronic music', 'rock', 'classical',
+                'jazz', 'hip hop', 'rap', 'musical theatre', 'opera', 'festivals',
+                'vinyl', 'records', 'instruments', 'band'
+            ],
+            'reading': [
+                'books', 'reading', 'literature', 'novels', 'poetry', 'comics',
+                'manga', 'sci-fi', 'fantasy', 'mystery', 'thriller', 'biography',
+                'history books', 'non-fiction', 'kindle', 'audiobooks', 'writing',
+                'book club', 'storytelling'
+            ],
+            'outdoor': [
+                'hiking', 'camping', 'adventure', 'nature', 'gardening',
+                'fishing', 'hunting', 'bird watching', 'photography', 'rock climbing',
+                'mountaineering', 'kayaking', 'canoeing', 'sailing', 'beach',
+                'national parks', 'wilderness', 'survival', 'bushcraft', 'foraging'
+            ],
+            'fashion': [
+                'clothes', 'fashion', 'shopping', 'style', 'shoes', 'accessories',
+                'jewelry', 'watches', 'bags', 'designer', 'vintage', 'streetwear',
+                'sustainable fashion', 'beauty', 'makeup', 'skincare', 'perfume',
+                'grooming', 'luxury'
+            ],
+            'wellness': [
+                'meditation', 'mindfulness', 'yoga', 'spa', 'massage',
+                'aromatherapy', 'self-care', 'health', 'nutrition', 'wellness',
+                'mental health', 'relaxation', 'pilates', 'alternative medicine',
+                'natural remedies'
+            ],
+            'collecting': [
+                'stamps', 'coins', 'antiques', 'vintage', 'memorabilia',
+                'action figures', 'cards', 'comics', 'art prints', 'vinyl records',
+                'toys', 'models', 'collectibles'
+            ],
+            'travel': [
+                'travel', 'tourism', 'backpacking', 'sightseeing', 'culture',
+                'languages', 'photography', 'road trips', 'flying', 'cruises',
+                'hotels', 'resorts', 'vacation', 'exploration'
+            ],
+            'pets': [
+                'dogs', 'cats', 'pets', 'animals', 'birds', 'fish',
+                'reptiles', 'pet care', 'veterinary', 'training', 'grooming',
+                'animal welfare'
+            ]
         }
 
         self.occasion_keywords = {
-            'birthday': ['birthday', 'bday'],
-            'christmas': ['christmas', 'xmas'],
-            'anniversary': ['anniversary', 'wedding anniversary'],
-            'wedding': ['wedding', 'marriage'],
-            'graduation': ['graduation', 'graduating'],
-            'housewarming': ['housewarming', 'new home'],
+            'birthday': [
+                'birthday', 'bday', 'birth day', 'birthdays', 'born',
+                'special day', 'another year'
+            ],
+            'christmas': [
+                'christmas', 'xmas', 'holiday season', 'festive', 'december 25',
+                'santa', 'christmas day', 'holidays', 'winter holidays'
+            ],
+            'anniversary': [
+                'anniversary', 'wedding anniversary', 'years together',
+                'relationship milestone', 'yearly celebration', 'married years'
+            ],
+            'wedding': [
+                'wedding', 'marriage', 'getting married', 'bride', 'groom',
+                'bridal', 'engagement', 'honeymoon', 'newlyweds'
+            ],
+            'graduation': [
+                'graduation', 'graduating', 'graduate', 'diploma', 'degree',
+                'academic achievement', 'university', 'college', 'school completion'
+            ],
+            'housewarming': [
+                'housewarming', 'new home', 'moving house', 'first home',
+                'moving in', 'new apartment', 'new house'
+            ],
+            'valentines': [
+                'valentines', 'valentine\'s day', 'valentine', 'romance',
+                'romantic', 'february 14', 'love'
+            ],
+            'mothers_day': [
+                'mothers day', 'mother\'s day', 'mum', 'mom', 'mama',
+                'mothering sunday'
+            ],
+            'fathers_day': [
+                'fathers day', 'father\'s day', 'dad', 'papa', 'daddy'
+            ],
+            'easter': [
+                'easter', 'paschal', 'spring holiday'
+            ],
+            'retirement': [
+                'retirement', 'retiring', 'pension', 'end of career',
+                'work farewell', 'professional milestone'
+            ],
+            'baby_shower': [
+                'baby shower', 'expecting', 'pregnancy', 'new baby',
+                'baby celebration', 'mother to be'
+            ],
+            'thank_you': [
+                'thank you', 'thanks', 'appreciation', 'grateful',
+                'gratitude', 'recognition'
+            ]
         }
 
     def extract_gift_criteria(self, description: str) -> Dict:
@@ -238,19 +343,34 @@ class NLPService:
     def _map_interests_to_categories(self, interests: List[str]) -> List[str]:
         """Map interests to gift categories"""
         category_mapping = {
-            'sports': ['sports_outdoor', 'fitness'],
-            'technology': ['electronics', 'gadgets'],
-            'cooking': ['kitchen', 'food_drink'],
-            'art': ['crafts', 'creative'],
-            'music': ['entertainment', 'experiences'],
-            'reading': ['books', 'education'],
-            'outdoor': ['adventure', 'experiences'],
-            'fashion': ['fashion', 'accessories'],
+            'sports': ['sports_outdoor', 'fitness', 'experiences', 'adventure'],
+            'technology': ['electronics', 'gadgets', 'gaming', 'smart_home', 'photography'],
+            'cooking': ['kitchen', 'food_drink', 'gourmet', 'cooking_classes', 'experiences'],
+            'art': ['crafts', 'creative', 'art_supplies', 'home_decor', 'experiences'],
+            'music': ['entertainment', 'experiences', 'music_equipment', 'concert_tickets'],
+            'reading': ['books', 'education', 'entertainment', 'subscriptions'],
+            'outdoor': ['adventure', 'experiences', 'sports_outdoor', 'garden', 'travel'],
+            'fashion': ['fashion', 'accessories', 'jewelry', 'beauty', 'luxury'],
+            'wellness': ['beauty', 'spa', 'fitness', 'health', 'experiences'],
+            'collecting': ['collectibles', 'antiques', 'art', 'memorabilia'],
+            'travel': ['experiences', 'adventure', 'travel_accessories', 'luggage'],
+            'pets': ['pets', 'animals', 'experiences'],
+            'gaming': ['gaming', 'electronics', 'entertainment'],
+            'photography': ['photography', 'electronics', 'experiences', 'art'],
+            'beauty': ['beauty', 'fashion', 'spa', 'luxury'],
+            'food': ['food_drink', 'gourmet', 'experiences', 'kitchen'],
+            'wine': ['food_drink', 'experiences', 'gourmet'],
+            'crafts': ['crafts', 'creative', 'art_supplies', 'hobbies'],
+            'gardening': ['garden', 'outdoor', 'home', 'experiences'],
+            'home': ['home_decor', 'smart_home', 'kitchen', 'garden'],
+            'luxury': ['luxury', 'experiences', 'fashion', 'jewelry'],
+            'entertainment': ['entertainment', 'experiences', 'gadgets', 'subscriptions']
         }
         
+        # Get all unique categories for the given interests
         categories = set()
         for interest in interests:
             if interest in category_mapping:
                 categories.update(category_mapping[interest])
         
-        return list(categories) 
+        return list(categories)

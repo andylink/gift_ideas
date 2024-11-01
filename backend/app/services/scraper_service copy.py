@@ -103,12 +103,10 @@ class ScraperService:
     def _scrape_buyagift(self, criteria):
         """
         Scrapes BuyAGift website based on given criteria using Selenium
-        Limited to first 25 gifts
         """
         gifts = []
         base_url = "https://www.buyagift.co.uk"
         driver = None
-        MAX_GIFTS = 25
         
         try:
             driver = self._get_driver()
@@ -116,64 +114,55 @@ class ScraperService:
             max_price = criteria.get('max_price', 1000)
             
             for url in search_urls:
-                if len(gifts) >= MAX_GIFTS:
-                    break
-                
                 try:
                     self.logger.info(f"Scraping URL: {url}")
                     driver.get(url)
                     
-                    # Initial wait for first products
+                    # Save page source for debugging
+                    debug_file = self.debug_folder / 'buyagift_debug.html'
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(driver.page_source)
+                    
                     wait = WebDriverWait(driver, 10)
+                    gift_elements = wait.until(
+                        EC.presence_of_all_elements_located(
+                            (By.CSS_SELECTOR, '[data-product-id]')
+                        )
+                    )
                     
-                    # Scroll down in smaller increments to ensure images load
-                    viewport_height = driver.execute_script("return window.innerHeight")
-                    scroll_amount = viewport_height // 2  # Scroll half a viewport at a time
-                    
-                    for scroll in range(3):  # Do 3 small scrolls
-                        driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
-                        time.sleep(3)  # Longer pause for lazy loading
-                    
-                    # Scroll back to top
-                    driver.execute_script("window.scrollTo(0, 0);")
-                    time.sleep(2)  # Wait for any final loading
-                    
-                    # Get all gift elements
-                    gift_elements = driver.find_elements(By.CSS_SELECTOR, '[data-product-id]')
                     self.logger.info(f"Found {len(gift_elements)} gift elements")
                     
-                    # Process only up to MAX_GIFTS elements
-                    for element in gift_elements[:MAX_GIFTS - len(gifts)]:
+                    for element in gift_elements:
                         try:
-                            # Wait for each individual image to be loaded
-                            wait.until(lambda d: element.find_element(
-                                By.CSS_SELECTOR, 
-                                'div[data-media-carousel="true"] img[src*="buyagift.co.uk/common/client/Images/Product"]'
-                            ).get_attribute('src'))
-                            
                             title = element.find_element(By.CSS_SELECTOR, 'h3[data-testid="product-name"]').get_attribute('title')
                             price_text = element.find_element(By.CSS_SELECTOR, 'span[data-testid="price"]').text
                             price = float(price_text.replace('£', '').replace(',', ''))
                             link = element.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
                             full_link = base_url + link if not link.startswith('http') else link
                             
+                            # Extract image URL - updated for carousel structure
                             try:
+                                # Look for the image within the product card using the specific structure
                                 img_elem = element.find_element(
                                     By.CSS_SELECTOR, 
                                     'div[data-media-carousel="true"] img[src*="buyagift.co.uk/common/client/Images/Product"]'
                                 )
                                 
                                 if img_elem:
+                                    # Get the largest image version by replacing the size in the URL
                                     image_url = img_elem.get_attribute('src')
+                                    # Convert to large version if it's a small one
                                     image_url = image_url.replace('/Small/', '/Large/')
                                     self.logger.info(f"Found valid BuyAGift product image: {image_url}")
                                 else:
+                                    # Fallback to check for srcset
                                     img_elem = element.find_element(
                                         By.CSS_SELECTOR,
                                         'div[data-media-carousel="true"] picture source[srcset]'
                                     )
                                     if img_elem:
                                         srcset = img_elem.get_attribute('srcset')
+                                        # Extract the largest image URL from srcset
                                         urls = srcset.split(',')
                                         for url in urls:
                                             if 'Large' in url:
@@ -183,11 +172,11 @@ class ScraperService:
                                     else:
                                         image_url = None
                                         self.logger.warning(f"No product image found for gift: {title}")
-                                    
+
                             except Exception as img_error:
                                 self.logger.warning(f"Could not find image for gift: {title}. Error: {str(img_error)}")
                                 image_url = None
-                                
+                            
                             if price <= max_price:
                                 gift = Gift(
                                     name=title,
@@ -211,7 +200,7 @@ class ScraperService:
             if driver:
                 driver.quit()
         
-        return gifts[:MAX_GIFTS]
+        return gifts
 
     def _get_buyagift_search_urls(self, criteria):
         """

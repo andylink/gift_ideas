@@ -21,5 +21,5 @@ class Gift(db.Model):
             'category': self.category,
             'affiliate_link': self.affiliate_link,
             'tags': self.tags.split(',') if self.tags else [],
-            'image_path': self.image_path  # Add this line
+             'image_path': self.image_path  # Add this line
         } 
